@@ -1,0 +1,106 @@
+# Example Helm values for giskard-wb-api. Copy, edit, and install:
+#   cp values.yaml.example values.yaml
+#   helm dependency update chart
+#   helm upgrade --install giskard-wb-api ./chart -n giskard --create-namespace -f values.yaml
+#
+# Only the settings you are likely to change are shown; chart/values.yaml has
+# the full reference and defaults. `config` uses the same layout as
+# config.example.yaml (the chart sets server.host, server.port,
+# server.database_path and secrets_dir itself).
+
+image:
+  repository: ghcr.io/your-org/giskard-wb-api
+  tag: "0.1.0"
+
+config:
+  server:
+    log_level: info
+    cors_allowed_origins: [https://giskard.example.com]
+
+  oidc:
+    issuer: https://auth.example.com/realms/giskard
+    audience: [giskard-api]
+    # required_scope: giskard:runs
+    admin_role: giskard-admin
+    roles_claim: realm_access.roles
+
+  minio:
+    endpoint: http://minio.minio.svc.cluster.local:9000
+    # Host in presigned download links returned to browsers.
+    public_endpoint: https://minio.example.com
+    # Must be reachable from the Lambda.ai GPU nodes.
+    job_endpoint: https://minio.example.com
+
+  storage:
+    allowed_trainer_locations: [giskard-artifacts/wheels]
+    allowed_dataset_locations: [giskard-datasets]
+    allowed_config_locations: [giskard-artifacts/configs]
+    results_location: giskard-results/runs
+
+  runs:
+    gpus:
+      H100: [1, 2, 4, 8]
+      A100-80GB: [1, 2, 4, 8]
+      A10: [1]
+    max_runtime_minutes: 1440
+
+  skypilot:
+    # Empty: use the SkyPilot API server deployed by this chart.
+    api_server_endpoint: ""
+    # region: us-east-1
+    disk_size_gb: 256
+
+# Credentials, mounted as files; each Secret key is the config key it sets.
+secrets:
+  # Recommended: a Secret managed outside Helm (external-secrets, sealed-secrets,
+  # or kubectl), with keys minio.access_key and minio.secret_key, plus optionally
+  # minio.job_access_key, minio.job_secret_key, skypilot.service_account_token:
+  #   kubectl -n giskard create secret generic giskard-wb-api-credentials \
+  #     --from-literal minio.access_key=... --from-literal minio.secret_key=...
+  # existingSecret: giskard-wb-api-credentials
+  # Otherwise the chart creates the Secret from these values:
+  values:
+    minio.access_key: change-me
+    minio.secret_key: change-me
+    # A narrowly scoped key for training jobs (read inputs, write results).
+    # minio.job_access_key: change-me
+    # minio.job_secret_key: change-me
+    # Only if SkyPilot authentication is enabled (skypilot.auth.oauth):
+    # skypilot.service_account_token: sky_...
+
+# SQLite run database.
+persistence:
+  size: 1Gi
+  # storageClass: ""
+
+ingress:
+  enabled: true
+  className: nginx
+  certManager:
+    enabled: true
+    issuer: letsencrypt-prod
+    issuerKind: ClusterIssuer
+  hosts:
+    - host: giskard-api.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+
+# Lambda.ai API key for the bundled SkyPilot API server. Prefer creating the
+# Secret out of band and leaving create: false:
+#   kubectl -n giskard create secret generic lambda-credentials --from-literal api_key=<key>
+lambdaCredentials:
+  create: false
+  # apiKey: ""
+
+# Turn on when other workloads share the cluster: only giskard-wb-api pods may
+# reach the (unauthenticated in-cluster) SkyPilot API server.
+networkPolicy:
+  enabled: false
+
+skypilot:
+  enabled: true
+  # apiService:
+  #   resources:
+  #     requests: {cpu: "4", memory: 8Gi}
+  #     limits: {cpu: "4", memory: 8Gi}

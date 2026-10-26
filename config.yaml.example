@@ -1,0 +1,96 @@
+# giskard-wb-api configuration. Copy to config.yaml and run:
+#   giskard-wb-api --config config.yaml
+# In Kubernetes the Helm chart renders this file into a ConfigMap from its
+# `config` values and mounts it at /etc/giskard-wb-api/config.yaml.
+# Unknown keys are rejected. Settings marked "required" have no default.
+
+# Directory holding credential files, one per credential, named by its config
+# key (minio.access_key, minio.secret_key, minio.job_access_key,
+# minio.job_secret_key, skypilot.service_account_token). In Kubernetes this is
+# the mounted Secret. Relative paths are resolved against this file's directory.
+# A credential must be given either here or inline below, not both.
+# secrets_dir: /etc/giskard-wb-api/secrets
+
+server:
+  host: 0.0.0.0
+  port: 8080
+  log_level: info
+  # Browser origins allowed by CORS. Empty = no cross-origin access.
+  cors_allowed_origins: [https://giskard.example.com]
+  database_path: ./data/giskard-wb-api.db
+
+# Bearer access tokens.
+oidc:
+  issuer: https://auth.example.com/realms/giskard     # required
+  # Audiences the access token may carry for this API (at least one).
+  audience: [giskard-api]                             # required
+  # Skip discovery and use this JWKS directly.
+  # jwks_uri: https://auth.example.com/realms/giskard/protocol/openid-connect/certs
+  algorithms: [RS256, PS256, ES256]
+  clock_tolerance_seconds: 30
+  # Scope every caller must hold.
+  # required_scope: giskard:runs
+  # Administrators can see and control all runs (scope and/or role).
+  # admin_scope: giskard:admin
+  admin_role: giskard-admin
+  roles_claim: realm_access.roles
+  # Require the RFC 9068 "at+jwt" header if your IdP sets it.
+  require_at_jwt_type: false
+
+minio:
+  endpoint: http://minio.internal:9000                # required
+  # Host used in presigned download links returned to browsers (default: endpoint).
+  public_endpoint: https://minio.example.com
+  # Host the Lambda.ai job uses; must be reachable from the GPU node (default: public_endpoint).
+  job_endpoint: https://minio.example.com
+  region: us-east-1
+  force_path_style: true
+  # Required, here or in secrets_dir. Inline values are for local development.
+  access_key: change-me
+  secret_key: change-me
+  # Recommended: a separate, narrowly scoped key for training jobs (read the
+  # trainer/dataset/config locations, read+write results_location).
+  # Defaults to the server's key.
+  # job_access_key: change-me
+  # job_secret_key: change-me
+
+storage:
+  # Approved input locations, as bucket[/prefix].
+  allowed_trainer_locations: [giskard-artifacts/wheels]   # required
+  allowed_dataset_locations: [giskard-datasets]           # required
+  allowed_config_locations: [giskard-artifacts/configs]
+  # Run outputs go to <results_location>/<run-id>/outputs/
+  results_location: giskard-results/runs                  # required
+  presign_ttl_seconds: 900
+
+runs:
+  # GPU types and the counts callers may request.
+  gpus:                                                   # required
+    H100: [1, 2, 4, 8]
+    A100-80GB: [1, 2, 4, 8]
+    A10: [1]
+  max_runtime_minutes: 1440
+  # Seconds the trainer gets after SIGTERM (stop or runtime limit) before SIGKILL.
+  stop_grace_seconds: 600
+  status_poll_interval_seconds: 30
+  max_inline_config_bytes: 262144
+
+skypilot:
+  # SkyPilot API server, which holds the Lambda.ai credentials and runs the jobs
+  # controller (in Kubernetes: deployed by the Helm chart's skypilot dependency).
+  # If unset, the SkyPilot SDK starts a local API server on this machine. That is
+  # for development only: it needs `pip install -e '.[local-sky]'` and
+  # ~/.lambda_cloud/lambda_keys.
+  # api_server_endpoint: http://skypilot-api-service.skypilot.svc.cluster.local
+  # Only when that server enforces authentication (prefer secrets_dir):
+  # service_account_token: sky_...
+  infra: lambda
+  # region: us-east-1
+  disk_size_gb: 256
+  # image_id:
+  job_name_prefix: giskard
+  # Limit for one SkyPilot API call, and the size of the thread pool those
+  # (blocking) calls run on.
+  request_timeout_seconds: 120
+  threads: 8
+  launch_timeout_seconds: 1800

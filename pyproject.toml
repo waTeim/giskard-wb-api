@@ -1,0 +1,43 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "giskard-wb-api"
+version = "0.1.0"
+description = "Giskard training-run API: SkyPilot managed jobs on Lambda.ai with MinIO storage"
+requires-python = ">=3.11"
+dependencies = [
+  # SkyPilot client SDK. Keep on the same release as the Helm chart's skypilot
+  # dependency. No extras: [lambda] only adds API-server components, and the
+  # cloud credentials live on the SkyPilot API server.
+  "skypilot==0.14.0",
+  # Already installed by skypilot; listed because the server imports them directly.
+  "fastapi",
+  "uvicorn",
+  "pydantic>=2.11",
+  "pyjwt[crypto]>=2.8",
+  "pyyaml",
+  "httpx",
+  # The only dependency skypilot does not already bring.
+  "boto3",
+]
+
+[project.optional-dependencies]
+# anyio (installed with fastapi) provides the pytest plugin for the async tests.
+test = ["pytest>=8"]
+# A local SkyPilot API server for development, used when
+# skypilot.api_server_endpoint is not configured (needs ~/.lambda_cloud/lambda_keys).
+# SkyPilot 0.14.0's API server fails to start with FastAPI 0.145 and later.
+local-sky = ["skypilot[lambda]==0.14.0", "fastapi<0.145"]
+
+[project.scripts]
+giskard-wb-api = "giskard_wb_api.server:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# Raised inside SkyPilot when the SDK is imported.
+filterwarnings = ["ignore:.*declarative_base.*"]

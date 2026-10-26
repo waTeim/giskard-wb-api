@@ -1,0 +1,68 @@
+{{- if .Values.ingress.enabled -}}
+{{- $fullName := include "giskard-wb-api.fullname" . -}}
+{{- $cm := .Values.ingress.certManager -}}
+{{- range .Values.ingress.hosts }}
+{{- if not .host }}
+{{- fail "ingress.hosts[].host is required when the ingress is enabled" }}
+{{- end }}
+{{- end }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ $fullName }}
+  labels:
+    {{- include "giskard-wb-api.labels" . | nindent 4 }}
+  {{- if or .Values.ingress.annotations $cm.enabled }}
+  annotations:
+    {{- if $cm.enabled }}
+    {{- if eq $cm.issuerKind "ClusterIssuer" }}
+    cert-manager.io/cluster-issuer: {{ required "ingress.certManager.issuer is required" $cm.issuer | quote }}
+    {{- else if eq $cm.issuerKind "Issuer" }}
+    cert-manager.io/issuer: {{ required "ingress.certManager.issuer is required" $cm.issuer | quote }}
+    {{- else }}
+    {{- fail "ingress.certManager.issuerKind must be ClusterIssuer or Issuer" }}
+    {{- end }}
+    {{- end }}
+    {{- with .Values.ingress.annotations }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+  {{- end }}
+spec:
+  {{- with .Values.ingress.className }}
+  ingressClassName: {{ . }}
+  {{- end }}
+  {{- if .Values.ingress.tls }}
+  tls:
+    {{- range .Values.ingress.tls }}
+    - hosts:
+        {{- range .hosts }}
+        - {{ . | quote }}
+        {{- end }}
+      secretName: {{ .secretName }}
+    {{- end }}
+  {{- else if $cm.enabled }}
+  tls:
+    - hosts:
+        {{- range .Values.ingress.hosts }}
+        - {{ .host | quote }}
+        {{- end }}
+      secretName: {{ $fullName }}-tls
+  {{- end }}
+  rules:
+    {{- range .Values.ingress.hosts }}
+    - host: {{ .host | quote }}
+      http:
+        paths:
+          {{- range .paths }}
+          - path: {{ .path }}
+            {{- with .pathType }}
+            pathType: {{ . }}
+            {{- end }}
+            backend:
+              service:
+                name: {{ $fullName }}
+                port:
+                  name: http
+          {{- end }}
+    {{- end }}
+{{- end }}

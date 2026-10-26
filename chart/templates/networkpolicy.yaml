@@ -1,0 +1,25 @@
+{{- if and .Values.skypilot.enabled .Values.networkPolicy.enabled }}
+# Only giskard-wb-api (and explicitly listed peers) may reach the SkyPilot API server.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "giskard-wb-api.fullname" . }}-skypilot-api
+  labels:
+    {{- include "giskard-wb-api.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      app: {{ include "giskard-wb-api.skypilotFullname" . }}-api
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              {{- include "giskard-wb-api.selectorLabels" . | nindent 14 }}
+        {{- with .Values.networkPolicy.skypilotApiExtraFrom }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      ports:
+        - port: 46580
+          protocol: TCP
+{{- end }}

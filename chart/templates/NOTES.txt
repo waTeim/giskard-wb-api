@@ -1,0 +1,43 @@
+giskard-wb-api {{ .Chart.AppVersion }} is deployed as {{ include "giskard-wb-api.fullname" . }} in namespace {{ .Release.Namespace }}.
+
+{{- if .Values.ingress.enabled }}
+
+API endpoint:
+{{- range .Values.ingress.hosts }}
+  https://{{ .host }}/api/runs
+{{- end }}
+{{- if .Values.ingress.certManager.enabled }}
+
+TLS certificate: issued by cert-manager ({{ .Values.ingress.certManager.issuerKind }}/{{ .Values.ingress.certManager.issuer }}).
+Check its status with:
+  kubectl -n {{ .Release.Namespace }} get certificate
+{{- end }}
+{{- else if .Values.httpRoute.enabled }}
+
+API endpoint (via Gateway API):
+{{- range .Values.httpRoute.hostnames }}
+  https://{{ . }}/api/runs
+{{- end }}
+{{- else }}
+
+No ingress is enabled. For local access:
+  kubectl -n {{ .Release.Namespace }} port-forward svc/{{ include "giskard-wb-api.fullname" . }} 8080:{{ .Values.service.port }}
+  curl http://127.0.0.1:8080/healthz
+{{- end }}
+
+All /api/runs endpoints require an OIDC access token for audience {{ .Values.config.oidc.audience | join ", " | quote }}
+from issuer {{ .Values.config.oidc.issuer }}.
+
+SkyPilot API server: {{ include "giskard-wb-api.skypilotEndpoint" . }}
+{{- if .Values.skypilot.enabled }}
+  Deployed by this release (Lambda.ai key from Secret {{ .Values.skypilot.lambdaCredentials.lambdaSecretName }}).
+  Check it with:
+    kubectl -n {{ .Release.Namespace }} rollout status deploy/{{ include "giskard-wb-api.skypilotFullname" . }}-api-server
+    kubectl -n {{ .Release.Namespace }} port-forward svc/{{ include "giskard-wb-api.skypilotFullname" . }}-api-service 46580:80   # then: sky api login -e http://127.0.0.1:46580
+{{- end }}
+
+Server configuration: ConfigMap {{ include "giskard-wb-api.fullname" . }} (config.yaml).
+Credentials: Secret {{ include "giskard-wb-api.secretName" . }} (mounted as files).
+Run database: {{ if .Values.persistence.enabled }}PVC {{ include "giskard-wb-api.pvcName" . }} (kept on uninstall){{ else }}emptyDir — run history is lost when the pod restarts!{{ end }}
+
+Run `helm test {{ .Release.Name }} -n {{ .Release.Namespace }}` to check the deployment.

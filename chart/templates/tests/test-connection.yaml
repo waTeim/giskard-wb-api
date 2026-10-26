@@ -1,0 +1,33 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: "{{ include "giskard-wb-api.fullname" . }}-test-connection"
+  labels:
+    {{- include "giskard-wb-api.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": test
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+spec:
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 65534
+    seccompProfile:
+      type: RuntimeDefault
+  containers:
+    - name: wget
+      image: busybox:1.37
+      securityContext:
+        allowPrivilegeEscalation: false
+        capabilities:
+          drop: [ALL]
+      command: ['sh', '-c']
+      args:
+        - |
+          set -e
+          base="http://{{ include "giskard-wb-api.fullname" . }}:{{ .Values.service.port }}"
+          wget -qO- "$base/healthz"
+          echo
+          # API endpoints must reject unauthenticated callers.
+          wget -S -qO- "$base/api/runs" 2>&1 | grep -q "401 Unauthorized"
+          echo "unauthenticated request rejected"
+  restartPolicy: Never

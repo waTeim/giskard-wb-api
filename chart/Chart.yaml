@@ -1,0 +1,24 @@
+apiVersion: v2
+name: giskard-wb-api
+description: Giskard training-run API — SkyPilot managed jobs on Lambda.ai with MinIO storage and OIDC auth
+type: application
+
+# Chart version (SemVer); bump on every chart change.
+version: 0.4.0
+
+# Version of the giskard-wb-api server image; used as the default image tag.
+appVersion: "0.1.0"
+
+kubeVersion: ">=1.25.0-0"
+keywords:
+  - giskard
+  - training
+  - skypilot
+
+dependencies:
+  # SkyPilot API server: giskard-wb-api's gateway to Lambda.ai (and other ML clouds).
+  # Disable with skypilot.enabled=false to use an existing SkyPilot deployment.
+  - name: skypilot
+    version: 0.14.0          # keep in step with skypilot in pyproject.toml
+    repository: https://helm.skypilot.co
+    condition: skypilot.enabled

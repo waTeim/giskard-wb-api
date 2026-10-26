@@ -1,0 +1,44 @@
+# Example values for a production-like install (also used by `helm lint` / chart-testing).
+#   helm upgrade --install giskard-wb-api ./chart -n giskard --create-namespace -f my-values.yaml
+
+image:
+  repository: ghcr.io/your-org/giskard-wb-api
+  tag: "0.1.0"
+
+config:
+  server:
+    cors_allowed_origins: [https://giskard.example.com]
+  oidc:
+    issuer: https://auth.example.com/realms/giskard
+    audience: [giskard-api]
+  minio:
+    endpoint: http://minio.minio.svc.cluster.local:9000
+    public_endpoint: https://minio.example.com
+    job_endpoint: https://minio.example.com
+  storage:
+    allowed_trainer_locations: [giskard-artifacts/wheels]
+    allowed_dataset_locations: [giskard-datasets]
+    allowed_config_locations: [giskard-artifacts/configs]
+    results_location: giskard-results/runs
+
+secrets:
+  # Prefer an externally managed Secret in production:
+  # existingSecret: giskard-wb-api-credentials
+  values:
+    minio.access_key: example-access-key
+    minio.secret_key: example-secret-key
+    # Only if SkyPilot authentication is enabled (skypilot.auth.oauth):
+    # skypilot.service_account_token: sky_...
+
+# Lambda.ai API key for the bundled SkyPilot API server. Prefer creating the
+# `lambda-credentials` Secret out of band and leaving create: false.
+lambdaCredentials:
+  create: true
+  apiKey: example-lambda-key
+
+ingress:
+  hosts:
+    - host: giskard-api.example.com
+      paths:
+        - path: /
+          pathType: Prefix

@@ -1,0 +1,41 @@
+# Local build and deploy settings for the Makefile.
+#
+# Copy to config.mk (or run `make config`) and edit. config.mk is not committed.
+# Values here override the Makefile defaults; command-line variables
+# (e.g. `make push TAG=dev`) override both.
+
+# Container CLI (docker, podman, ...).
+DOCKER = docker
+
+# Registry/namespace to push to, e.g. ghcr.io/your-org or 123456789012.dkr.ecr.us-east-1.amazonaws.com
+REGISTRY =
+
+# Image repository name.
+IMAGE_NAME = giskard-wb-api
+
+# Image tag. Defaults to the version in pyproject.toml.
+# TAG = dev
+
+# Also tag and push :latest (true/false).
+TAG_LATEST = true
+
+# Target platform(s) for the build.
+PLATFORM = linux/amd64
+
+# Extra arguments for `docker build`, e.g. --no-cache or --build-arg HTTP_PROXY=...
+BUILD_ARGS =
+
+# --- Helm (make install) -------------------------------------------------------
+
+# Helm CLI.
+HELM = helm
+
+# Release name and namespace (created if missing).
+RELEASE = giskard-wb-api
+NAMESPACE = giskard
+
+# Values file, e.g. a copy of values.yaml.example.
+VALUES = values.yaml
+
+# Extra arguments for `helm upgrade --install`, e.g. --wait --timeout 10m or --kube-context prod
+HELM_ARGS =
